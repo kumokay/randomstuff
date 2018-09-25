@@ -4,6 +4,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import io
+import time
 
 from PIL import Image
 import msgpackrpc
@@ -31,9 +32,9 @@ class ColorFinder(object):
     def send(self, t_sent, bytedata):
         img = Image.open(io.BytesIO(bytedata))
         if has_red_obj(img):
-            msg = 'found red objects in picture'
+            msg = 'found red objects in picture; latency={}'.format(t_sent - time.time())
         else:
-            msg = 'nothing found'
+            msg = 'nothing found; latency={}'.format(t_sent - time.time())
         result = self.client.call('send', t_sent, msg)
         print('forward data to {}:{}, result={}'.format(
             self.forward_to_ip, self.forward_to_port, result))

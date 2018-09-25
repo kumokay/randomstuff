@@ -114,9 +114,10 @@ class Topo(object):
                 cur_x, cur_y, cur_z,
                 next_x, next_y, next_z,
                 duration))
-        while duration > 0:
-            sta.setPosition('{}, {}, {}'.format(next_x, next_y, next_z))
-            duration -= 1
+        sta.setPosition('{}, {}, {}'.format(next_x, next_y, next_z))
+        if duration > 0:
+            sleep(duration)
+        log.info('{} rssi: {}'.format(sta_name, sta.params['rssi']))
 
     def add_nodes(self, mode='containernet'):
         """
@@ -148,10 +149,18 @@ class Topo(object):
         ap1 = self.net.addAccessPoint(
             'ap1', ssid='new-ssid', mode='g', channel='1',
             position='0,0,0', range=100)
+        ap2 = self.net.addAccessPoint(
+            'ap2', ssid='new-ssid', mode='g', channel='1',
+            position='-100,0,0', range=60)
+        ap3 = self.net.addAccessPoint(
+            'ap3', ssid='new-ssid', mode='g', channel='1',
+            position='-150,0,0', range=100)
         self.net.addController(self.c1)
 
         # add all nodes to dict
         self.ap_dict['ap1'] = ap1
+        self.ap_dict['ap2'] = ap2
+        self.ap_dict['ap3'] = ap3
         self.host_dict['h1'] = h1
         self.sta_dict['sta1'] = sta1
         self.sta_dict['sta2'] = sta2
@@ -161,6 +170,8 @@ class Topo(object):
 
         log.info("*** Associating and Creating links\n")
         self.net.addLink(ap1, h1, delay='5ms')
+        self.net.addLink(ap1, ap2, delay='10ms')
+        self.net.addLink(ap2, ap3, delay='10ms')
 
 
 def test():
