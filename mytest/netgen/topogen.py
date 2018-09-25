@@ -45,8 +45,20 @@ class Topo(object):
         self.c1.start()
         for ap_name, ap_obj in iteritems(self.ap_dict):
             ap_obj.start([self.c1])
-        # wait for setup
-        sleep(3)
+        sleep(3)  # wait for setup
+        # TODO: clean this shit
+        result = self.exec_cmd(
+            'h1',
+            'python main.py color_finder 10.0.0.11:18800 10.0.0.13:18800')
+        log.info(result)
+        result = self.exec_cmd(
+            'sta1',
+            'python main.py data_forwarder 172.18.0.3 10.0.0.11:18800')
+        log.info(result)
+        result = self.exec_cmd(
+            'sta2',
+            'python main.py display_server 10.0.0.13:18800')
+        log.info(result)
 
     def run_cli(self):
         log.info("*** Running CLI\n")
@@ -55,6 +67,15 @@ class Topo(object):
     def stop(self):
         log.info("*** Stopping network\n")
         self.net.stop()
+
+    def exec_cmd(self, node_name, cmd):
+        if node_name in self.sta_dict:
+            node = self.sta_dict[node_name]
+        elif node_name in self.host_dict:
+            node = self.host_dict[node_name]
+        else:
+            assert False, 'no such node {}'.format(node_name)
+        return node.cmd(cmd)
 
     def move_station(self, sta_name, next_pos=None, speed=None):
         assert sta_name in self.sta_dict
@@ -93,7 +114,6 @@ class Topo(object):
             ap_dict, sw_dict, host_dict, sta_dict
         """
         log.info("*** Creating nodes\n")
-        # mode = 'mininet'
         if mode == 'mininet':
             h1 = self.net.addHost(
                 'h1', cls=Node, mac='00:00:00:00:00:01', ip='10.0.0.11/8')
@@ -102,7 +122,7 @@ class Topo(object):
             sta2 = self.net.addStation(
                 'sta2', cls=Station, mac='00:00:00:00:00:03', ip='10.0.0.13/8')
         else:
-            dimage_name = 'kumokay/ubuntu_wifi:v2'
+            dimage_name = 'kumokay/ubuntu_wifi:v3'
             h1 = self.net.addHost(
                 'h1', cls=Docker, dimage=dimage_name,
                 mac='00:00:00:00:00:01', ip='10.0.0.11/8')

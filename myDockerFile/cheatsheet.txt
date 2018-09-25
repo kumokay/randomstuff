@@ -1,0 +1,8 @@
+docker images -a
+docker build -t yourhubusername/imagename:version .
+docker push yourhubusername/imagename:version
+
+docker ps
+docker exec -it <container name> /bin/bash
+
+docker kill <container name>

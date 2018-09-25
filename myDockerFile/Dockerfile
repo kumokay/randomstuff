@@ -1,6 +1,6 @@
 # Use an official Python runtime as a parent image
 FROM ubuntu:trusty
-RUN apt-get update 
+RUN apt-get update
 #&& apt-get install -y --no-install-recommends apt-utils
 
 # install some tools
@@ -11,14 +11,16 @@ RUN apt-get -y install python-pip
 RUN pip install --upgrade pip
 RUN pip install msgpack-rpc-python
 RUN pip install numpy
+RUN pip install Pillow
+RUN pip install future
 
 RUN mkdir -p /opt/github
 WORKDIR /opt/github
 RUN git clone https://github.com/kumokay/sharescript.git
+RUN git clone https://github.com/kumokay/randomstuff.git
 
 # RUN apt-get -y install iputils-ping
 
 # assign entrypoint workdir
-WORKDIR /opt/github/sharescript/airsim
+WORKDIR /opt/github/randomstuff/mytest
 RUN date > date.txt
-

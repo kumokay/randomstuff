@@ -7,7 +7,7 @@ import sys
 import time
 
 from entity import (
-    data_forwarder, color_finder, display_server, client)
+    mininet_server, data_forwarder, color_finder, display_server, client)
 
 if __name__ == '__main__':
     if len(sys.argv) < 1:
@@ -33,6 +33,11 @@ if __name__ == '__main__':
         with open(path, 'r') as fd:
             bytes = fd.read()
         client.call(ip, port, 'send', time.time(), bytes)
+    elif entity == 'mininet_server':
+        # python main.py mininet_server 172.17.20.12:18800
+        ip, port = sys.argv[2].split(':')
+        port = int(port)
+        mininet_server.run_server(ip, port)
     elif entity == 'data_forwarder':
         # python main.py data_forwarder 172.17.20.12:18900 172.18.0.14:18800
         ip, port = sys.argv[2].split(':')
