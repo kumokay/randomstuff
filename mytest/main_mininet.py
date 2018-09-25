@@ -33,6 +33,9 @@ if __name__ == '__main__':
         with open(path, 'r') as fd:
             bytes = fd.read()
         client.call(ip, port, 'send', time.time(), bytes)
+    elif entity == 'mininet':
+        from netgen import topogen
+        topogen.test()
     elif entity == 'mininet_server':
         # python main.py mininet_server 172.17.20.12:18800
         ip, port = sys.argv[2].split(':')

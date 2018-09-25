@@ -1,5 +1,7 @@
 # Use an official Python runtime as a parent image
-FROM kumokay/ubuntu_wifi:v2
+FROM ubuntu:trusty
+#RUN apt-get update
+#&& apt-get install -y --no-install-recommends apt-utils
 
 # install some tools
 RUN apt-get -y install git wget
@@ -14,6 +16,7 @@ RUN pip install future
 
 RUN mkdir -p /opt/github
 WORKDIR /opt/github
+RUN git clone https://github.com/kumokay/sharescript.git
 RUN git clone https://github.com/kumokay/randomstuff.git
 
 # RUN apt-get -y install iputils-ping

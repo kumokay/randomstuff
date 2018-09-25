@@ -36,28 +36,41 @@ class Topo(object):
         # self.net.plotGraph(max_x=200, max_y=200)
         self.ts_netstart = time()
         # trigger attachment
+        self.net.startMobility(time=0, repetitions=1)
         for sta_name, sta_obj in iteritems(self.sta_dict):
-            self.net.startMobility(time=0, repetitions=1)
             self.net.mobility(sta_obj, 'start', time=1, position='0,0,0')
             self.net.mobility(sta_obj, 'stop', time=2, position='0,0,0')
-            self.net.stopMobility(time=3)
+        self.net.stopMobility(time=3)
         self.net.build()
         self.c1.start()
         for ap_name, ap_obj in iteritems(self.ap_dict):
             ap_obj.start([self.c1])
-        sleep(3)  # wait for setup
+        sleep(5)  # wait for setup
+        CLI_wifi(self.net)
         # TODO: clean this shit
         result = self.exec_cmd(
             'h1',
-            'python main.py color_finder 10.0.0.11:18800 10.0.0.13:18800')
+            'ping 10.0.0.13 -c 1')
         log.info(result)
         result = self.exec_cmd(
             'sta1',
-            'python main.py data_forwarder 172.18.0.3 10.0.0.11:18800')
+            'ping 10.0.0.11 -c 1')
         log.info(result)
         result = self.exec_cmd(
             'sta2',
-            'python main.py display_server 10.0.0.13:18800')
+            'ping 10.0.0.12 -c 1')
+        log.info(result)
+        result = self.exec_cmd(
+            'h1',
+            'python main.py color_finder 10.0.0.11:18800 10.0.0.13:18800 &')
+        log.info(result)
+        result = self.exec_cmd(
+            'sta1',
+            'python main.py data_forwarder 172.18.0.3:18800 10.0.0.11:18800 &')
+        log.info(result)
+        result = self.exec_cmd(
+            'sta2',
+            'python main.py display_server 10.0.0.13:18800 &')
         log.info(result)
 
     def run_cli(self):
@@ -122,7 +135,7 @@ class Topo(object):
             sta2 = self.net.addStation(
                 'sta2', cls=Station, mac='00:00:00:00:00:03', ip='10.0.0.13/8')
         else:
-            dimage_name = 'kumokay/ubuntu_wifi:v3'
+            dimage_name = 'kumokay/ubuntu_wifi:v4'
             h1 = self.net.addHost(
                 'h1', cls=Docker, dimage=dimage_name,
                 mac='00:00:00:00:00:01', ip='10.0.0.11/8')
