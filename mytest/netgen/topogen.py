@@ -27,7 +27,7 @@ class Topo(object):
         self.host_dict = {}
         self.sta_dict = {}
         self.net = Mininet_wifi(accessPoint=OVSKernelAP)
-        self.net.propagationModel(model="logDistance", exp=5)
+        self.net.propagationModel(model="logDistance", exp=3)
         self.c1 = RemoteController('c1', ip='172.17.20.12', port=6633)
         self.add_nodes()
 
@@ -66,11 +66,11 @@ class Topo(object):
         log.info(result)
         result = self.exec_cmd(
             'sta1',
-            'python main.py data_forwarder 172.18.0.3:18800 10.0.0.11:18800 &')
+            'python main.py data_forwarder 172.18.0.3:18800 10.0.0.11:18800 True &')
         log.info(result)
         result = self.exec_cmd(
             'sta2',
-            'python main.py display_server 10.0.0.13:18800 &')
+            'python main.py data_forwarder 10.0.0.13:18800 172.17.20.12:19000 False &')
         log.info(result)
 
     def run_cli(self):
@@ -147,7 +147,7 @@ class Topo(object):
                 mac='00:00:00:00:00:03', ip='10.0.0.13/8')
         ap1 = self.net.addAccessPoint(
             'ap1', ssid='new-ssid', mode='g', channel='1',
-            position='0,0,0', range=60)
+            position='0,0,0', range=100)
         self.net.addController(self.c1)
 
         # add all nodes to dict

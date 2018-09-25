@@ -9,4 +9,4 @@ import msgpackrpc
 def call(ip, port, cmd, *argv):
     client = msgpackrpc.Client(msgpackrpc.Address(ip, port))
     result = client.call(cmd, *argv)
-    print('Client call {}, argv={}, result={}'.format(cmd, argv, result))
+    print('Client call {}, result={}'.format(cmd, result))

@@ -31,6 +31,7 @@ if __name__ == '__main__':
             '/home/kumokay/Documents/image/new_img/'
             '2018-09-22-17-22-10/output_5sec/1537662205.png')
         with open(path, 'r') as fd:
+            print(fd)
             bytes = fd.read()
         client.call(ip, port, 'send', time.time(), bytes)
     elif entity == 'data_forwarder':
@@ -39,7 +40,9 @@ if __name__ == '__main__':
         port = int(port)
         forward_to_ip, forward_to_port = sys.argv[3].split(':')
         forward_to_port = int(forward_to_port)
-        data_forwarder.run_server(ip, port, forward_to_ip, forward_to_port)
+        is_timestamper = sys.argv[4] is True
+        data_forwarder.run_server(
+            ip, port, forward_to_ip, forward_to_port, is_timestamper)
     elif entity == 'color_finder':
         # python main.py color_finder 172.17.20.12:18800
         ip, port = sys.argv[2].split(':')
