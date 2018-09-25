@@ -16,11 +16,17 @@ class MininetServer(object):
         # self.topo.run_cli()
         # self.topo.stop()
 
-    def move(self, x, y, z, speed):
+    def move(self, t_sent, x, y, z, speed):
+        x = float(x)
+        y = float(y)
+        z = float(z)
+        speed = float(speed)
+        print('move sta1 to {} {} {}'.format(x, y, z))
         self.topo.move_station('sta1', next_pos=(x, y, z), speed=speed)
         return 'ACK'
 
-    def stop(self):
+    def stop(self, t_sent):
+        print('stop')
         self.topo.run_cli()
         self.topo.stop()
         return 'ACK'
