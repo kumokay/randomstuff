@@ -4,13 +4,13 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import sys
-sys.path.append('/home/kumokay/github/mininet-wifi')
+sys.path.append('/home/osboxes/github/mininet-wifi')
 from math import sqrt
 from time import sleep, time
 
 from future.utils import iteritems
 from mininet import log
-from mininet.node import RemoteController, Node, Docker
+from mininet.node import Controller, Node, Docker
 from mininet_wifi.wifi.node import OVSKernelAP, Station, DockerStation
 from mininet_wifi.wifi.cli import CLI_wifi
 from mininet_wifi.wifi.net import Mininet_wifi
@@ -28,7 +28,7 @@ class Topo(object):
         self.sta_dict = {}
         self.net = Mininet_wifi(accessPoint=OVSKernelAP)
         self.net.propagationModel(model="logDistance", exp=3)
-        self.c1 = RemoteController('c1', ip='172.17.20.12', port=6633)
+        self.c1 = Controller('c1')
         self.add_nodes()
 
     def start(self):
@@ -66,11 +66,11 @@ class Topo(object):
         log.info(result)
         result = self.exec_cmd(
             'sta1',
-            'python main.py data_forwarder 172.18.0.3:18800 10.0.0.11:18800 True &')
+            'python main.py data_forwarder 172.17.0.2:18800 10.0.0.11:18800 True &')
         log.info(result)
         result = self.exec_cmd(
             'sta2',
-            'python main.py data_forwarder 10.0.0.13:18800 172.17.20.12:19000 False &')
+            'python main.py data_forwarder 10.0.0.13:18800 192.168.56.102:18900 False &')
         log.info(result)
 
     def run_cli(self):

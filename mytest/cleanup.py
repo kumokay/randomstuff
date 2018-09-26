@@ -1,6 +1,6 @@
 from subprocess import call
 import sys
-sys.path.append('/home/kumokay/github/mininet-wifi')
+sys.path.append('/home/osboxes/github/mininet-wifi')
 from mininet.node import RemoteController, Node, Docker
 from mininet.log import setLogLevel, info
 from mininet_wifi.wifi.node import OVSKernelAP, Station, DockerStation

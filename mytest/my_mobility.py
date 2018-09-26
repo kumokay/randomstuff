@@ -1,6 +1,6 @@
 import sys
-sys.path.append('/home/kumokay/github/mininet-wifi')
-from mininet.node import RemoteController, Node, Docker
+sys.path.append('/home/osboxes/github/mininet-wifi')
+from mininet.node import Controller, Node, Docker
 from mininet.log import setLogLevel, info
 from mininet_wifi.wifi.node import OVSKernelAP, Station, DockerStation
 from mininet_wifi.wifi.cli import CLI_wifi
@@ -14,7 +14,8 @@ def topology(mode='containernet', is_enable_cli=True):
     mode (str): miminet or containernet
     is_enable_cli (bool): running CLI
     """
-    c1 = RemoteController('c1', ip='172.17.20.12', port=6633)
+    # c1 = RemoteController('c1', ip='localhost', port=6633)
+    c1 = Controller('c1')
     net = Mininet_wifi(accessPoint=OVSKernelAP)
     net.propagationModel(model="logDistance", exp=3)
 
@@ -28,7 +29,7 @@ def topology(mode='containernet', is_enable_cli=True):
         sta2 = net.addStation(
             'sta2', cls=Station, mac='00:00:00:00:00:03', ip='10.0.0.13/8')
     else:
-        dimage_name = 'kumokay/ubuntu_wifi:v2'
+        dimage_name = 'kumokay/ubuntu_wifi:v4'
         h1 = net.addHost(
             'h1', cls=Docker, dimage=dimage_name,
             mac='00:00:00:00:00:01', ip='10.0.0.11/8')

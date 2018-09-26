@@ -10,14 +10,23 @@ from PIL import Image
 import msgpackrpc
 
 
-def has_red_obj(img):
-    w, h = img.size
-    n_red = 0
+def count_r_g_b(img):
+    nr, ng, nb = 0, 0, 0
     for pixel in img.getdata():
         r, g, b, _ = pixel
-    if r > 80 and b < 40 and g < 40:
-        n_red += 1
-    return n_red / w * h > 0.3
+        nr += int(r > 127)
+        ng += int(g > 127)
+        nb += int(b > 127)
+    w, h = img.size
+    threshold = w * h / 2
+    if nr > threshold:
+        return 'red'
+    elif ng > threshold:
+        return 'green'
+    elif nb > threshold:
+        return 'blue'
+    else:
+        return 'a little bit of everything'
 
 
 class ColorFinder(object):
@@ -31,10 +40,8 @@ class ColorFinder(object):
 
     def send(self, t_sent, bytedata):
         img = Image.open(io.BytesIO(bytedata))
-        if has_red_obj(img):
-            msg = 'found red objects in picture; latency={}'.format(t_sent - time.time())
-        else:
-            msg = 'nothing found; latency={}'.format(t_sent - time.time())
+        color = count_r_g_b(img)
+        msg = '{}; latency={}'.format(color, time.time() - t_sent)
         result = self.client.call('send', t_sent, msg)
         print('forward data to {}:{}, result={}'.format(
             self.forward_to_ip, self.forward_to_port, result))
