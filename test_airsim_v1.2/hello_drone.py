@@ -13,226 +13,274 @@ import pprint
 
 import sys
 import math
-from airsim import Vector3r
-
-g_drone_id = 0
-g_image_id = 1
-# g_image_folder = 'G:\\my_github\\AirSim\\Unreal\\Environments\\Blocks\\my_img\\'
-# g_image_folder = 'G:\\my_github\\myAirsimProject\\CityEnviron\\image\\'
-g_image_folder = 'D:\\airsim\\randomstuff-master\\mytest\\PythonClient_1.0\\img\\'
-
-def mylog(msg):
-    print('[drone_{}] {}'.format(g_drone_id, msg))
-
-def mylog_screen():
-    # TODO: fix this 
-    global g_drone_id, g_image_id, g_image_folder
-    # get camera images from the car
-    responses = client.simGetImages([
-        ImageRequest(0, AirSimImageType.DepthVis, pixels_as_float=True),  # center front, depth visualiztion image
-        ImageRequest(0, AirSimImageType.Scene), # center front, scene vision image in png format
-    ])
-    mylog('Retrieved images: %d' % len(responses))
-
-    tmp_dir = g_image_folder + 'drone_{}\\'.format(g_drone_id)
-    mylog ("Saving images to %s" % tmp_dir)
-    if not os.path.isdir(tmp_dir):
-        try:
-            os.makedirs(tmp_dir)
-        except OSError:
-            raise
-    filename_prefix = tmp_dir + "{}-".format(g_image_id)
-    g_image_id += 1
-    for idx, response in enumerate(responses):
-        filename = filename_prefix + str(idx)
-        if response.pixels_as_float:
-            mylog("Type %d, size %d" % (response.image_type, len(response.image_data_float)))
-            AirSimClientBase.write_pfm(os.path.normpath(filename + '.pfm'), AirSimClientBase.getPfmArray(response))
-        elif response.compress: #png format
-            mylog("Type %d, size %d" % (response.image_type, len(response.image_data_uint8)))
-            AirSimClientBase.write_file(os.path.normpath(filename + '.png'), response.image_data_uint8)
-            #### send to forwarder
-            # TODO: clean this
-            with open(os.path.normpath(filename + '.png'), 'r') as fd:
-                myrpcclient = msgpackrpc.Client(msgpackrpc.Address('192.168.56.102', 18800))
-                result = myrpcclient.call('send', time.time(), response.image_data_uint8)
-                print('image sent to forwarder: {}'.format(result))
-        else: #uncompressed array
-            mylog("Type %d, size %d" % (response.image_type, len(response.image_data_uint8)))
-            img1d = np.fromstring(response.image_data_uint8, dtype=np.uint8) #get numpy array
-            img_rgba = img1d.reshape(response.height, response.width, 4) #reshape array to 4 channel image array H X W X 4
-            img_rgba = np.flipud(img_rgba) #original image is fliped vertically
-            img_rgba[:,:,1:2] = 100 #just for fun add little bit of green in all pixels
-            AirSimClientBase.write_png(os.path.normpath(filename + '.greener.png'), img_rgba) #write to png
+import logging
+import msgpackrpc
+from PIL import Image
 
 
-
-def degreesToRadians(degrees):
-    return math.pi * degrees / 180.0
-
-def GeodeticToNedFast(geo, home):
-    d_lat = geo.latitude - home.latitude;
-    d_lon = geo.longitude - home.longitude;
-    d_alt = home.altitude - geo.altitude;
-    EARTH_RADIUS = 6378137.0
-    x = degreesToRadians(d_lat) * EARTH_RADIUS
-    y = degreesToRadians(d_lon) * EARTH_RADIUS * math.cos(degreesToRadians(geo.latitude))
-    return Vector3r(x, y, d_alt)
-
-def nedToGeodeticFast(local, home):
-    d_lat = local.x_val / EARTH_RADIUS;
-    d_lon = local.y_val / (EARTH_RADIUS * math.cos(degreesToRadians(home.latitude)));
-    latitude = home.latitude + radiansToDegrees(d_lat);
-    longitude = home.longitude + radiansToDegrees(d_lon);
-    altitude = home.altitude - local.z_val;
-    return GeoPoint(latitude,longitude,altitude)
-
-def getCalibratedPos(pos, ref):
-    return Vector3r(pos.x_val - ref.x_val, pos.y_val - ref.y_val, pos.z_val - ref.z_val)
-
-def getCalibratedPosFromGps(gps, home, ref):
-    pos = GeodeticToNedFast(gps, home)
-    return Vector3r(pos.x_val - ref.x_val, pos.y_val - ref.y_val, pos.z_val - ref.z_val)
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger()
 
 
-def degree2Radius(degree):
-    return degree / 360 * 2 * math.pi
+class mininetHelper:
+    _SERVER_ADDR = '192.168.56.102:19000'
+    _DRONE_ADDR = '192.168.56.102:18000'
 
-########################
-# connect drone
-########################
-argc = len(sys.argv)
-if argc < 1:
-    mylog('usage: python _hello_drone.py {Drone1 | Drone2}')
-    exit(0)
-drone_name = (sys.argv[1])
-# connect to the AirSim simulator
-# ip = "127.0.0.1"
-# port = 41451 + g_drone_id
+    def __init__(self, server_addr=None, drone_addr=None):
+        if not server_addr:
+            server_addr = self._SERVER_ADDR
+        if not drone_addr:
+            drone_addr = self._DRONE_ADDR
+        ip, port = server_addr.split(':')
+        self.server_ip = ip
+        self.server_port = int(port)
+        ip, port = drone_addr.split(':')
+        self.drone_ip = ip
+        self.drone_port = int(port)
+    
+    def send_image(self, filename):
+        with open(filename, 'r') as fd:
+            myrpcclient = msgpackrpc.Client(
+                msgpackrpc.Address(self.drone_ip, self.drone_port))
+            result = myrpcclient.call(
+                'send', time.time(), response.image_data_uint8)
+            log.info('image sent to forwarder: {}'.format(result))
 
-# connect to the AirSim simulator
-client = airsim.MultirotorClient()
-client.confirmConnection()
-client.enableApiControl(True, drone_name)
-client.armDisarm(True, drone_name)
+    def move_drone(self, origin_pos, next_pos, speed):
+        log.info("move drone in mininet")
+        rel_x, rel_y, rel_z = (
+            origin_pos.x_val - next_pos.x_val, 
+            origin_pos.y_val - next_pos.y_val, 
+            origin_pos.z_val - next_pos.z_val)
+        myrpcclient = msgpackrpc.Client(
+            msgpackrpc.Address(self.server_ip, self.server_port))
+        myrpcclient.call('move', time.time(), rel_x, rel_y, rel_z, speed)
 
-multirotor_state = client.getMultirotorState(vehicle_name=drone_name)
-print('multirotor_state={}'.format(multirotor_state))
+class screenshotHelper:
+    _DEFAULT_FOLDER = 'D:\\airsim_v1.2.0\\screenshot\\'
 
-landed = multirotor_state.landed_state
-if landed == airsim.LandedState.Landed:
-    print("taking off...")
-    client.takeoffAsync(vehicle_name=drone_name).join()
-else:
-    print("already flying...")
-    client.hoverAsync(vehicle_name=drone_name).join()
+    def __init__(self, drone_name, client, image_folder=''):
+        self.image_id = 1
+        self.drone_name = drone_name
+        self.client = client
+        if not image_folder:
+            image_folder = self._DEFAULT_FOLDER
+        image_folder += '{}\\'.format(self.drone_name)
+        if not os.path.isdir(image_folder):
+            try:
+                os.makedirs(image_folder)
+            except OSError:
+                log.error('cannot create dir: {}'.format(image_folder))
+        self.image_folder = image_folder
+        log.info('save image to: {}'.format(self.image_folder))
 
-# client.getGpsLocation()
-home_gps_location = client.getMultirotorState(vehicle_name=drone_name).gps_location
-pos = GeodeticToNedFast(home_gps_location, home_gps_location)
-print('gps={}, pos={}'.format(home_gps_location, pos))
+    def do_screenshot(self, is_display=False):
+        """ get camera images from the car
+        Returns:
+            image_paths (list): filepaths of the screenshots
+        """
+        responses = self.client.simGetImages([
+            airsim.ImageRequest("front_center", airsim.ImageType.Scene),
+            airsim.ImageRequest("bottom_center", airsim.ImageType.Scene),
+        ])
+        log.debug('Retrieved images: %d' % len(responses))
+        filename_prefix = self.image_folder + "{}-".format(self.image_id)
+        self.image_id += 1
+        image_paths = []
+        for idx, response in enumerate(responses):
+            filename = filename_prefix + str(idx)
+            if response.compress: #png format
+                log.debug('image type {}, size {}'.format(
+                    response.image_type, len(response.image_data_uint8)))
+                filename = os.path.normpath(filename + '.png')
+                airsim.write_file(filename, response.image_data_uint8)
+            else:
+                log.error('error: image format not support')
+            image_paths.append(filename)
+        if is_display:
+            self.display(image_paths)
+        return image_paths
 
-# client.getPosition()
-kinematics_state = client.simGetGroundTruthKinematics(vehicle_name=drone_name)
-print(kinematics_state)
-cur_pos_vector3r = kinematics_state.position
-cur_pos = (cur_pos_vector3r.x_val, cur_pos_vector3r.y_val, cur_pos_vector3r.z_val)
-origin_pos = cur_pos
-cur_yaw = 0
+    @staticmethod
+    def display(filepath_list):
+        images = [Image.open(file) for file in filepath_list]
+        padding = 5
+        widths, heights = zip(*(i.size for i in images))
+        total_width = sum(widths) + padding * len(images)
+        max_height = max(heights)
+        new_im = Image.new('RGB', (total_width, max_height))
+        x_offset = 0
+        for im in images:
+            new_im.paste(im, (x_offset, 0))
+            x_offset += im.size[0] + padding
+        new_im.show()
 
-while True:
-    scale = 1
-    pressed_key = airsim.wait_key(
-        'Press AWSD,R(up)F(down)QE(turn right/left) key to move vehicle {}m at {}m/s.\n'.format(scale, scale)
-        + 'Press P to take images.\n'
-        + 'Press B key to reset to original state.\n'
-        + 'Press O key to release API control.\n'
-    )
-    pressed_key = pressed_key.decode('utf-8')
-    pressed_key = pressed_key.lower()
-    mylog("pressed_key={}".format(pressed_key))
-    if pressed_key == 'p':
-        mylog_screen()
-    elif pressed_key == 'o':
-        client.enableApiControl(False, drone_name)
-        break
-    elif pressed_key == 'b':
-        client.reset()
-    else:
-        move_x, move_y, move_z, speed = 0, 0, 0, 1
-        speed = speed*scale
-        if pressed_key == 'a':
-            move_y = -1*scale
-        elif pressed_key == 'd':
-            move_y = +1*scale
-        elif pressed_key == 'w':
-            move_x = +1*scale
-        elif pressed_key == 's':
-            move_x = -1*scale
-        elif pressed_key == 'r':
-            move_z = -1*scale
-        elif pressed_key == 'f':
-            move_z = +1*scale
-        elif pressed_key == 'q':
-            cur_yaw -= 30
-            move_x = +1*scale
-        elif pressed_key == 'e':
-            cur_yaw += 30
-            move_x = +1*scale
 
-        # compute current angle
-        if move_x:
-            dx = move_x * math.cos(degree2Radius(cur_yaw))
-            dy = move_x * math.sin(degree2Radius(cur_yaw))
+class GpsUtils:
+    _EARTH_RADIUS = 6378137.0
+
+    @staticmethod
+    def degreesToRadians(degrees):
+        return math.pi * degrees / 180.0
+
+    @classmethod
+    def geodeticToNedFast(cls, geo, home):
+        d_lat = geo.latitude - home.latitude;
+        d_lon = geo.longitude - home.longitude;
+        d_alt = home.altitude - geo.altitude;
+        x = cls.degreesToRadians(d_lat) * cls._EARTH_RADIUS
+        y = cls.degreesToRadians(d_lon) * (
+            cls._EARTH_RADIUS * math.cos(cls.degreesToRadians(geo.latitude)))
+        return airsim.Vector3r(x, y, d_alt)
+
+    @staticmethod
+    def getCalibratedPos(pos, ref):
+        return airsim.Vector3r(
+            pos.x_val - ref.x_val, pos.y_val - ref.y_val, pos.z_val - ref.z_val)
+
+    @classmethod
+    def getCalibratedPosFromGps(cls, gps, home, ref):
+        pos = cls.geodeticToNedFast(gps, home)
+        return airsim.Vector3r(
+            pos.x_val - ref.x_val, pos.y_val - ref.y_val, pos.z_val - ref.z_val)
+
+
+class DroneController:
+    _DIRECTION_DICT = {
+        # (move_x, move_y, move_z, yaw_diff)
+        'A': (0, -1, 0, 0),
+        'D': (0, +1, 0, 0),
+        'W': (+1, 0, 0, 0),
+        'S': (-1, 0, 0, 0),
+        'R': (0, 0, -1, 0),
+        'F': (0, 0, +1, 0),
+        'Q': (+1, 0, 0, -45),  # W + yaw(angle)
+        'E': (+1, 0, 0, +45),  # W + yaw(angle)
+    }
+
+    def __init__(self, drone_name, is_mininet_enabled=False):
+        self.drone_name = drone_name
+        self.is_mininet_enabled = is_mininet_enabled
+        self.cur_yaw = 0
+        self.scale = 1
+        self.speed = 1
+
+    @staticmethod
+    def compute_abs_direction(cur_yaw, scale, move_xyz_yaw):
+        """
+        Returns: dx, dy, dz
+        """
+        move_x, move_y, move_z, yaw_diff = move_xyz_yaw
+        cur_yaw += yaw_diff
+        if move_x != 0:
+            move_x *= scale
+            dx = move_x * math.cos(GpsUtils.degreesToRadians(cur_yaw))
+            dy = move_x * math.sin(GpsUtils.degreesToRadians(cur_yaw))
             dz = move_z
-        if move_y:
-            dx = move_y * math.cos(degree2Radius(cur_yaw + 90))
-            dy = move_y * math.sin(degree2Radius(cur_yaw + 90))
+        elif move_y != 0:
+            move_y *= scale
+            dx = move_y * math.cos(GpsUtils.degreesToRadians(cur_yaw + 90))
+            dy = move_y * math.sin(GpsUtils.degreesToRadians(cur_yaw + 90))
             dz = move_z
-        cur_state = client.getMultirotorState(vehicle_name=drone_name)
-        cur_pos = cur_state.kinematics_estimated.position
-        print("{},{} => {},{}".format(move_x, move_y, dx, dy))
+        elif move_z != 0:
+            move_z *= scale
+            dx = move_x
+            dy = move_y
+            dz = move_z
+        log.info("rel vector ({},{},{}) => abs vector ({},{}, {})".format(
+            move_x, move_y, move_z, dx, dy, dz))
+        return dx, dy, dz, cur_yaw
 
-        next_pos = Vector3r(cur_pos.x_val + dx, cur_pos.y_val + dy, cur_pos.z_val + dz)
-        mylog("try to move: {} -> {}".format(cur_pos, next_pos))
-        # rc = client.moveByVelocityAsync(
-        #     dx, dy, dz, 1,
-        #     yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=cur_yaw),
-        #     vehicle_name=drone_name).join()
-        rc = client.moveToPositionAsync(
-            next_pos.x_val, next_pos.y_val, next_pos.z_val, speed,
-            yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=cur_yaw), 
-            drivetrain=airsim.DrivetrainType.MaxDegreeOfFreedom,
-            vehicle_name=drone_name)
-        mylog("rc: {}".format(rc))
-        
-        ##########################
-        # move in mininet
-        ##########################
-        if False:
-            mylog("move nodes in mininet")
-            rel_x, rel_y, rel_z = (
-                origin_pos[0] - next_pos[0], 
-                origin_pos[1] - next_pos[1], 
-                origin_pos[2] - next_pos[2])
-            myrpcclient = msgpackrpc.Client(msgpackrpc.Address('192.168.56.102', 19000))
-            myrpcclient.call('move', time.time(), rel_x, rel_y, rel_z, speed)
+    def start_controller(self):
+        drone_name = self.drone_name
+        is_mininet_enabled = self.is_mininet_enabled
+        cur_yaw = self.cur_yaw
+        scale = self.scale
+        speed = self.speed
+
+        # create airsim client
+        client = airsim.MultirotorClient()
+        # create helpers
+        screenshot_helper = screenshotHelper(drone_name, client)
+        mininet_helper = mininetHelper()
+
+        # connect to the AirSim simulator
+        client.confirmConnection()
+        client.enableApiControl(True, drone_name)
+        client.armDisarm(True, drone_name)
+        multirotor_state = client.getMultirotorState(vehicle_name=drone_name)
+        log.info('multirotor_state={}'.format(multirotor_state))
+
+        landed = multirotor_state.landed_state
+        if landed == airsim.LandedState.Landed:
+            log.info("taking off...")
+            client.takeoffAsync(vehicle_name=drone_name).join()
         else:
-            mylog("airsim only mode. skip mininet code section")
-        
-        # is collision?
-        collision_info = client.simGetCollisionInfo(vehicle_name=drone_name)
-        if collision_info.has_collided:
-            mylog("Collision at pos %s, normal %s, impact pt %s, penetration %f, name %s, obj id %d" % (
-                pprint.pformat(collision_info.position), 
-                pprint.pformat(collision_info.normal), 
-                pprint.pformat(collision_info.impact_point), 
-                collision_info.penetration_depth, collision_info.object_name, collision_info.object_id))
-            break
+            log.info("already flying...")
+            client.hoverAsync(vehicle_name=drone_name).join()
 
-        cur_pos_vector3r = client.simGetGroundTruthKinematics(vehicle_name=drone_name).position 
-        print('cur_pos_vector3r={}'.format(cur_pos_vector3r))
-        cur_state = client.getMultirotorState(vehicle_name=drone_name)
-        print('state={}'.format(cur_state))
+        multirotor_state = client.getMultirotorState(vehicle_name=drone_name)
+        home_gps_location = multirotor_state.gps_location
+        pos = GpsUtils.geodeticToNedFast(home_gps_location, home_gps_location)
+        log.info('gps={}, pos={}'.format(home_gps_location, pos))
 
+        kinematics_state = client.simGetGroundTruthKinematics(
+            vehicle_name=drone_name)
+        log.debug('kinematics_state={}'.format(kinematics_state))
+        origin_pos = kinematics_state.position
+        display_info = (
+            'Press AWSD,R(up)F(down)QE(turn left/right) key to move the drone.\n' 
+            'Press P to take images.\n'
+            'Press B key to reset to original state.\n'
+            'Press O key to release API control.\n'
+            'drone will be moved {}m with speed {}m/s.\n').format(scale, speed)
 
+        while True:
+            pressed_key = airsim.wait_key(display_info).decode('utf-8').upper()
+            log.info("pressed_key={}".format(pressed_key))
+            if pressed_key == 'P':
+                image_file_list = screenshot_helper.do_screenshot(is_display=True)
+                if is_mininet_enabled:
+                    mininet_helper.send_image(image_file_list[0])
+            elif pressed_key == 'O':
+                client.enableApiControl(False, drone_name)
+                break
+            elif pressed_key == 'B':
+                client.reset()
+            else:
+                move_xyz_yaw = self._DIRECTION_DICT.get(pressed_key, None)
+                if move_xyz_yaw is None:
+                    log.error('invalid key')
+                    continue
+                dx, dy, dz, cur_yaw = self.compute_abs_direction(
+                    cur_yaw, scale, move_xyz_yaw)
+                # move the drong
+                cur_state = client.getMultirotorState(vehicle_name=drone_name)
+                cur_pos = cur_state.kinematics_estimated.position
+                next_pos = airsim.Vector3r(
+                    cur_pos.x_val + dx, cur_pos.y_val + dy, cur_pos.z_val + dz)
+                log.info("try to move: {} -> {}".format(cur_pos, next_pos))
+                rc = client.moveToPositionAsync(
+                    next_pos.x_val, next_pos.y_val, next_pos.z_val, speed,
+                    yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=cur_yaw), 
+                    drivetrain=airsim.DrivetrainType.MaxDegreeOfFreedom,
+                    vehicle_name=drone_name)
+                log.info("rc: {}".format(rc))
+                if is_mininet_enabled:
+                    mininet_helper.move_drone(cur_pos, next_pos)
+                # is collision?
+                collision_info = client.simGetCollisionInfo(vehicle_name=drone_name)
+                if collision_info.has_collided:
+                    log.error('collided! collision_info={}'.format(collision_info))
+                    client.enableApiControl(False, drone_name)
+                    break
+
+if __name__ == '__main__':
+    argc = len(sys.argv)
+    if argc != 2:
+        log.error('usage: python _hello_drone.py {Drone1 | Drone2  | ...}')
+        exit(0)
+    drone_name = (sys.argv[1])
+    log.info('start controller for {}'.format(drone_name))
+    dc = DroneController(drone_name, is_mininet_enabled=False)
+    dc.start_controller()
