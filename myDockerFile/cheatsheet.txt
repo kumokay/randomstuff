@@ -3,6 +3,8 @@ docker build -t yourhubusername/imagename:version .
 docker build --no-cache -t yourhubusername/imagename:version .
 docker push yourhubusername/imagename:version
 
+sudo docker run -it yourhubusername/imagename:version /bin/bash
+
 docker ps
 docker exec -it <container name> /bin/bash
 
