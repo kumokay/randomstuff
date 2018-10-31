@@ -1,23 +1,8 @@
 # Use an official Python runtime as a parent image
-FROM kumokay/ubuntu_wifi:v2
-
-# install some tools
-RUN apt-get -y install git wget
-
-# install python packages
-RUN apt-get -y install python-pip
-RUN pip install --upgrade pip
-RUN pip install msgpack-rpc-python
-RUN pip install numpy
-RUN pip install Pillow
-RUN pip install future
-
-RUN mkdir -p /opt/github
-WORKDIR /opt/github
-RUN git clone https://github.com/kumokay/randomstuff.git
-
-# RUN apt-get -y install iputils-ping
+FROM kumokay/ubuntu_wifi:v6
 
 # assign entrypoint workdir
-WORKDIR /opt/github/randomstuff/mytest
+WORKDIR /opt/github/placethings
+RUN git pull
 RUN date > date.txt
+
