@@ -10,7 +10,7 @@ for i in range(25, 30):
     data = base64.b64encode(data)
     print(i)
     t1 = time.time()
-    client = msgpackrpc.Client(msgpackrpc.Address("172.17.49.70", 18800))
+    client = msgpackrpc.Client(msgpackrpc.Address("172.17.20.12", 18800))
     result = client.call('push', data, time.time())
     t2 = time.time()
     print(result)
